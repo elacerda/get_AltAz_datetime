@@ -7,6 +7,16 @@ closer timestamp from the event (object passing the registered altitude).
 Can also retrieve the timestamp from the azimuth fit using --get_from_az 
 option.
 
+The text output of the program is a csv row:
+
+	FILENAME,OBJNAME,FILTER,DATETIME,DIFFTIME
+
+	DATETIME is the timestamp found for the event (object at the Alt or Az)
+	DIFFTIME is DATETIME - DATE-OBS
+
+In order to check the fit, run the script with --plot command active in order to create
+a nice plot showing the fit and the values for the altitude and azimuth.
+
 Usage
 -----
 
@@ -38,6 +48,26 @@ Usage
 				-0.5,0.5 will create a timeline of 1 hour centered in header
 				DATE-OBS.
 	  --time_bins N         Number of timeline bins.
+
+Telegram Bot
+------------
+
+This script also can start a telegram bot [T80S AltAz DATETIME](https://t.me/t80s_altaz_dt_bot).
+It reads the enviroment variable TELEGRAM_ALTAZ_BOT_API_KEY. The bot has the following commands:
+
+	List of Commands:
+		/getAltDTDir YYYYMMDD [0/1 to PLOT]
+			Get datetime from Altitude fit for all files *.fits.fz from /IMAGE_PATH/YYYYMMDD/
+		/getAzDTDir YYYYMMDD [0/1 to PLOT]
+			Get datetime from Azimuth fit for all files *.fits.fz from /IMAGE_PATH/YYYYMMDD/
+		/getAltDTFile FILENAME [0/1 to PLOT]
+			Get datetime from Altitude fit for file FILENAME
+		/getAzDTFile FILENAME [0/1 to PLOT]
+			Get datetime from Azimuth fit for file FILENAME
+		/getAltAzDTFile FILENAME GET_FROM_AZ=0/1 PLOT=0/1 TIME_RANGE=-X,X TIME_N=N
+			Complete function to handle fit.
+		/listImages YYYYMMDD
+			List all files from directory /IMAGE_PATH/YYYYMMDD/
 
 Contact
 -------
