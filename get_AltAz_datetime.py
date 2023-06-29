@@ -56,6 +56,9 @@ def parse_arguments():
     parser.add_argument('--telegram', '-t', 
                         action='store_true', default=False, 
                         help='Start script as a Telegram Bot SERVICE (other arguments will be ignored).')
+    parser.add_argument('--header_date', '-D', 
+                        metavar='HEADERCARD', default='DATE-OBS', type=str, 
+                        help='FITS header card used to get datetime. Defaults to DATE-OBS.')
     parser.add_argument('--date', '-d', 
                         metavar='YYYYMMDD', default=None, type=str, 
                         help='Check all files from the same YYYYMMDD directory. If --filename is passed, --date will be ignored.')
@@ -65,12 +68,13 @@ def parse_arguments():
     parser.add_argument('--get_from_az', 
                         action='store_true', default=False, 
                         help='Get datetime from Azimuth fit instead from the Altitude (UNSTABLE).')  
-    time_range_help = 'Creates the timeline centred in header DATE-OBS. '
-    time_range_help += 'Example: -T -0.5,0.5 will create a timeline of 1 hour centered in header DATE-OBS.'
+    time_range_help = 'Creates the timeline centred in header card used to retrieve the datetime. '
+    time_range_help += 'Example: -T -0.5 0.5 will create a timeline of 1 hour centered in header '
+    time_range_help += 'card used to retrieve the datetime. Defaults to -0.25 0.25.'
     parser.add_argument('--time_range', '-T', metavar='FLOAT', type=float, nargs=2, default=[-0.25, 0.25],
                         help=time_range_help)
     parser.add_argument('--time_bins', metavar='N', type=int, default=1800, 
-                        help='Number of timeline bins.')
+                        help='Number of timeline bins. Defaults to 1800.')
     args = parser.parse_args(args=sys.argv[1:])
 
     # Parse arguments
@@ -94,7 +98,7 @@ def parse_arguments():
             sys.exit(1)
     return args
 
-def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.25], time_n=1800, debug=False):
+def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.25], time_n=1800, dt_card=None, debug=False):
     """
     TODO: Need HELP! 
     """
@@ -111,7 +115,9 @@ def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.2
     t80s_EL = EarthLocation(lat=t80s_lat, lon=t80s_lon, height=t80s_hei)
 
     # DATETIME
-    str_dt_obs = hdr.get('DATE-OBS') + '+00:00'
+    if dt_card is None:
+        dt_card = 'DATE-OBS'
+    str_dt_obs = hdr.get(dt_card) + '+00:00'
     dt_obs = datetime.fromisoformat(str_dt_obs)
     t80s_dt = dt_obs.astimezone(T80S_TZ)
     t80s_Time = Time(t80s_dt, location=t80s_EL)
@@ -362,10 +368,10 @@ def main_telegram_v13():
     def get_altaz_dt_file(update: Update, context: CallbackContext):
         ok = False
         try:
-            filename, get_from_az, plot, time_range, time_n = context.args
+            filename, get_from_az, plot, time_range, time_n, dt_card = context.args
             ok = True
         except:
-            update.message.reply_text('USAGE: /getAltAzDTFile FILENAME GET_FROM_AZ PLOT TIME_RANGE TIME_N')    
+            update.message.reply_text('USAGE: /getAltAzDTFile FILENAME GET_FROM_AZ PLOT TIME_RANGE TIME_N HEADERCARD')    
         if ok:
             get_from_az = bool(eval(get_from_az))
             plot = bool(eval(plot))
@@ -381,6 +387,7 @@ def main_telegram_v13():
                 time_range=time_range,
                 time_n=time_n,
                 plot=plot,
+                dt_card=dt_card,
             )
             if image_path is not None:
                 photo_file_id = open(image_path, 'rb')
@@ -440,13 +447,17 @@ if __name__ == '__main__':
                 time_range=args.time_range,
                 time_n=args.time_bins,
                 plot=args.plot,
+                dt_card=args.header_date,
             )
             print(final_message)
         elif args.date is not None:
             main_date(args)
 
 """
-#from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
+###
+### python-telegram-bot v20
+###
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=USAGE_MESSAGE)
