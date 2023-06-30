@@ -133,34 +133,42 @@ def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.2
     # TARGET
     target_coords = SkyCoord(ra=hdr.get('CRVAL1'), dec=hdr.get('CRVAL2'), unit=(u.deg, u.deg))
     target_AltAz = t80s_obs.altaz(timeline, target=target_coords)
+    target_dt_utc = None
 
     # TARGET ALT
-    target_in_alt = Angle(hdr.get('HIERARCH T80S TEL EL START'), 'deg')
-    #target_in_alt = Angle(hdr.get('ALT'), 'deg')
-    p_alt = np.polyfit(target_AltAz.alt.value, timeline_lin, 3)
-    i_alt = int(np.polyval(p_alt, target_in_alt.value))
-    target_alt_Time = timeline[i_alt]
-    target_alt_dt_utc = target_alt_Time.to_datetime().replace(tzinfo=UTC_TZ)
-    target_dt_utc = target_alt_dt_utc
+    _alt = hdr.get('HIERARCH T80S TEL EL START', None)
+    if _alt is not None:
+        target_in_alt = Angle(_alt, 'deg')
+        #target_in_alt = Angle(hdr.get('ALT'), 'deg')
+        p_alt = np.polyfit(target_AltAz.alt.value, timeline_lin, 3)
+        i_alt = int(np.polyval(p_alt, target_in_alt.value))
+        target_alt_Time = timeline[i_alt]
+        target_alt_dt_utc = target_alt_Time.to_datetime().replace(tzinfo=UTC_TZ)
+        target_dt_utc = target_alt_dt_utc
 
     # TARGET AZ
-    target_in_az = Angle(hdr.get('HIERARCH T80S TEL AZ START'), 'deg')
-    #target_in_az = Angle(hdr.get('AZ'), 'deg')
-    p_az = np.polyfit(target_AltAz.az.value, timeline_lin, 3)
-    i_az = int(np.polyval(p_az, target_in_az.value))
-    target_az_Time = timeline[i_az]
-    target_az_dt_utc = target_az_Time.to_datetime().replace(tzinfo=UTC_TZ)
-    target_dt_utc = target_az_dt_utc
+    _az = hdr.get('HIERARCH T80S TEL AZ START', None)
+    if _az is not None:
+        target_in_az = Angle(_az, 'deg')
+        #target_in_az = Angle(hdr.get('AZ'), 'deg')
+        p_az = np.polyfit(target_AltAz.az.value, timeline_lin, 3)
+        i_az = int(np.polyval(p_az, target_in_az.value))
+        target_az_Time = timeline[i_az]
+        target_az_dt_utc = target_az_Time.to_datetime().replace(tzinfo=UTC_TZ)
+        target_dt_utc = target_az_dt_utc
 
-    if get_from_az:
-        diff_time_az = (target_az_dt_utc - dt_obs).total_seconds()
-        diff_time = diff_time_az
+    if target_dt_utc is not None:
+        if get_from_az:
+            diff_time_az = (target_az_dt_utc - dt_obs).total_seconds()
+            diff_time = diff_time_az
+        else:
+            diff_time_alt = (target_alt_dt_utc - dt_obs).total_seconds()
+            diff_time = diff_time_alt
+
+        # FINAL PRINT
+        final_message = f'{filename},{hdr.get("OBJECT")},{hdr.get("FILTER")},{target_dt_utc},{diff_time}'
     else:
-        diff_time_alt = (target_alt_dt_utc - dt_obs).total_seconds()
-        diff_time = diff_time_alt
-
-    # FINAL PRINT
-    final_message = f'{filename},{hdr.get("OBJECT")},{hdr.get("FILTER")},{target_dt_utc},{diff_time}'
+        final_message = f'{filename},{hdr.get("OBJECT")},{hdr.get("FILTER")},None,None'
 
     ##########################################################################################
     # DEBUG
@@ -183,7 +191,7 @@ def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.2
     ##########################################################################################
     # PLOT
     ##########################################################################################
-    if plot:
+    if (target_dt_utc is not None) & plot:
         from matplotlib import pyplot as plt
         from matplotlib.dates import DateFormatter
 
