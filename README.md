@@ -24,7 +24,6 @@ Usage
 
 	usage: get_AltAz_datetime.py [-h] [--filename FITSFILE] [--telegram] [--date YYYYMMDD]
 				     [--plot] [--get_from_az] [--time_range FLOAT FLOAT]
-				     [--time_bins N]
 
 	Check FITS header ALT, AZ DATETIME difference from DATE-OBS DATETIME. Uses the RA, DEC
 	and DATE-OBS to create a timeline to retrieve the closer timestamp from the event (object
@@ -43,11 +42,10 @@ Usage
 	  --plot, -p            Plot the ALT/AZ datetime fit.
 	  --get_from_az         Get datetime from Azimuth fit instead from the Altitude
 				(UNSTABLE).
-	  --time_range FLOAT FLOAT, -T FLOAT FLOAT
+	  --time_range INT INT, -T INT INT
 				Creates the timeline centred in header DATE-OBS. Example: -T
-				-0.5,0.5 will create a timeline of 1 hour centered in header
-				DATE-OBS.
-	  --time_bins N         Number of timeline bins.
+				-100 100 will create a timeline of 200 seconds centered in header
+				DATE-OBS. Defaults to -100 100.
 
 Telegram Bot
 ------------
