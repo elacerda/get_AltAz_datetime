@@ -28,7 +28,7 @@ List of Commands:
         Get datetime from Altitude fit for file FILENAME
     /getAzDTFile FILENAME [0/1 to PLOT]
         Get datetime from Azimuth fit for file FILENAME
-    /getAltAzDTFile FILENAME GET_FROM_AZ=0/1 PLOT=0/1 TIME_RANGE=-X,X TIME_N=N
+    /getAltAzDTFile FILENAME GET_FROM_AZ=0/1 PLOT=0/1 TIME_RANGE=-X,X  HEADERCARD
         Complete function to handle fit.
     /listImages YYYYMMDD
         List all files from directory /IMAGE_PATH/YYYYMMDD/
@@ -69,12 +69,10 @@ def parse_arguments():
                         action='store_true', default=False, 
                         help='Get datetime from Azimuth fit instead from the Altitude (UNSTABLE).')  
     time_range_help = 'Creates the timeline centred in header card used to retrieve the datetime. '
-    time_range_help += 'Example: -T -0.5 0.5 will create a timeline of 1 hour centered in header '
-    time_range_help += 'card used to retrieve the datetime. Defaults to -0.25 0.25.'
-    parser.add_argument('--time_range', '-T', metavar='FLOAT', type=float, nargs=2, default=[-0.25, 0.25],
+    time_range_help += 'Example: -T -100 100 will create a timeline of 200 seconds centered in header '
+    time_range_help += 'card used to retrieve the datetime. Defaults to -100 100.'
+    parser.add_argument('--time_range', '-T', metavar='SECONDS', type=float, nargs=2, default=[-100, 100],
                         help=time_range_help)
-    parser.add_argument('--time_bins', metavar='N', type=int, default=1800, 
-                        help='Number of timeline bins. Defaults to 1800.')
     args = parser.parse_args(args=sys.argv[1:])
 
     # Parse arguments
@@ -98,7 +96,7 @@ def parse_arguments():
             sys.exit(1)
     return args
 
-def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.25], time_n=1800, dt_card=None, debug=False):
+def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-100, 1000], dt_card=None, debug=False):
     """
     TODO: Need HELP! 
     """
@@ -124,7 +122,8 @@ def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.2
 
     # TIMELINE
     tmin, tmax = time_range
-    timeline = t80s_Time + u.hour*np.linspace(tmin, tmax, time_n)
+    time_n = (tmax - tmin) + 1
+    timeline = t80s_Time + u.second*np.linspace(tmin, tmax, time_n)
     timeline_lin = np.asarray(list(range(time_n)))
 
     # OBSERVER
@@ -140,7 +139,7 @@ def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.2
     if _alt is not None:
         target_in_alt = Angle(_alt, 'deg')
         #target_in_alt = Angle(hdr.get('ALT'), 'deg')
-        p_alt = np.polyfit(target_AltAz.alt.value, timeline_lin, 3)
+        p_alt = np.polyfit(target_AltAz.alt.value, timeline_lin, 2)
         i_alt = int(np.polyval(p_alt, target_in_alt.value))
         target_alt_Time = timeline[i_alt]
         target_alt_dt_utc = target_alt_Time.to_datetime().replace(tzinfo=UTC_TZ)
@@ -151,7 +150,7 @@ def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-0.25, 0.2
     if _az is not None:
         target_in_az = Angle(_az, 'deg')
         #target_in_az = Angle(hdr.get('AZ'), 'deg')
-        p_az = np.polyfit(target_AltAz.az.value, timeline_lin, 3)
+        p_az = np.polyfit(target_AltAz.az.value, timeline_lin, 2)
         i_az = int(np.polyval(p_az, target_in_az.value))
         target_az_Time = timeline[i_az]
         target_az_dt_utc = target_az_Time.to_datetime().replace(tzinfo=UTC_TZ)
@@ -376,15 +375,14 @@ def main_telegram_v13():
     def get_altaz_dt_file(update: Update, context: CallbackContext):
         ok = False
         try:
-            filename, get_from_az, plot, time_range, time_n, dt_card = context.args
+            filename, get_from_az, plot, time_range, dt_card = context.args
             ok = True
         except:
-            update.message.reply_text('USAGE: /getAltAzDTFile FILENAME GET_FROM_AZ PLOT TIME_RANGE TIME_N HEADERCARD')    
+            update.message.reply_text('USAGE: /getAltAzDTFile FILENAME GET_FROM_AZ PLOT TIME_RANGE HEADERCARD')    
         if ok:
             get_from_az = bool(eval(get_from_az))
             plot = bool(eval(plot))
             time_range = list(eval(time_range))
-            time_n = int(time_n)
             if plot:
                 update.message.reply_text('PLOT ON')
             else:
@@ -393,7 +391,6 @@ def main_telegram_v13():
                 filename, 
                 get_from_az=get_from_az, 
                 time_range=time_range,
-                time_n=time_n,
                 plot=plot,
                 dt_card=dt_card,
             )
@@ -437,7 +434,6 @@ def main_date(args):
             filename=filename, 
             get_from_az=args.get_from_az, 
             time_range=args.time_range,
-            time_n=args.time_bins,
             plot=args.plot,
         )
         print(final_message)
@@ -453,7 +449,6 @@ if __name__ == '__main__':
                 filename=args.filename, 
                 get_from_az=args.get_from_az, 
                 time_range=args.time_range,
-                time_n=args.time_bins,
                 plot=args.plot,
                 dt_card=args.header_date,
             )
