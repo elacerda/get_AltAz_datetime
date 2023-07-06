@@ -71,7 +71,7 @@ def parse_arguments():
     time_range_help = 'Creates the timeline centred in header card used to retrieve the datetime. '
     time_range_help += 'Example: -T -100 100 will create a timeline of 200 seconds centered in header '
     time_range_help += 'card used to retrieve the datetime. Defaults to -100 100.'
-    parser.add_argument('--time_range', '-T', metavar='SECONDS', type=float, nargs=2, default=[-100, 100],
+    parser.add_argument('--time_range', '-T', metavar='SECONDS', type=int, nargs=2, default=[-100, 100],
                         help=time_range_help)
     args = parser.parse_args(args=sys.argv[1:])
 
