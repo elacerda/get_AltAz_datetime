@@ -45,7 +45,8 @@ TELEGRAM_BOT_API_KEY = getenv('TELEGRAM_ALTAZ_BOT_API_KEY')
 # T80S Reduction PATH
 IMAGES_PATH = getenv('IMGPATH')
 # TIMEZONES
-T80S_TZ = ZoneInfo('America/Santiago')
+T80S_TZ_STR = 'America/Santiago'
+T80S_TZ = ZoneInfo(T80S_TZ_STR)
 UTC_TZ = timezone.utc
 
 def parse_arguments():
@@ -95,6 +96,71 @@ def parse_arguments():
             print(f'{__script_name__}: {args.imgwildcard}: files not found')
             sys.exit(1)
     return args
+
+def get_altaz_dt_new(filename, dt_card=None):
+    """
+    TODO: Need HELP! 
+    """
+    import pytz
+
+    # HEADER
+    hdr = getheader(filename, 1)
+
+    # LOCATION
+    T80S_LAT = hdr.get('HIERARCH T80S TEL GEOLAT')  #'-30.1678638889 degrees'
+    T80S_LON = hdr.get('HIERARCH T80S TEL GEOLON')  #'-70.8056888889 degrees'
+    T80S_HEI = eval(hdr.get('HIERARCH T80S TEL GEOELEV'))  #2187
+    t80s_lat = Angle(T80S_LAT, 'deg')
+    t80s_lon = Angle(T80S_LON, 'deg')
+    t80s_hei = T80S_HEI*u.m
+    t80s_EL = EarthLocation(lat=t80s_lat, lon=t80s_lon, height=t80s_hei)
+    t80s_tz = pytz.timezone(T80S_TZ_STR)
+
+    t80s_obs = Observer(location=t80s_EL, timezone=t80s_tz)
+
+    # DATETIME
+    if dt_card is None:
+        dt_card = 'DATE-OBS'
+    dt_obs = pytz.utc.localize(datetime.fromisoformat(hdr.get(dt_card)))
+    t80s_Time = t80s_obs.datetime_to_astropy_time(dt_obs)
+    print(dt_obs)
+    print(t80s_Time)
+
+    # TARGET
+    target_coords = SkyCoord(ra=hdr.get('CRVAL1'), dec=hdr.get('CRVAL2'), unit=(u.deg, u.deg))
+    _alt = hdr.get('HIERARCH T80S TEL EL START', None)
+    target_input_alt = Angle(_alt, 'deg')
+    target_alt_set_Time = t80s_obs.target_set_time(
+        t80s_Time, 
+        target_coords,
+        horizon=target_input_alt,
+        which='nearest',
+        grid_times_targets=True,
+    )
+
+    target_alt_rise_Time = t80s_obs.target_rise_time(
+        t80s_Time, 
+        target_coords,
+        horizon=target_input_alt,
+        which='nearest',
+        grid_times_targets=True,
+    )
+
+    print(target_alt_rise_Time.datetime)
+    print(target_alt_set_Time.datetime)
+
+    diff_time_set = (target_alt_set_Time - t80s_Time).sec
+    diff_time_rise = (target_alt_rise_Time - t80s_Time).sec
+
+    diff_time = diff_time_set    
+    if abs(diff_time_rise) < abs(diff_time):
+        diff_time = diff_time_rise
+
+    target_dt_utc = target_alt_rise_Time.datetime  #t80s_obs.astropy_time_to_datetime(target_alt_rise_Time)
+    final_message = f'{filename},{hdr.get("OBJECT")},{hdr.get("FILTER")},{target_dt_utc},{diff_time}'
+
+    return final_message
+
 
 def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-100, 1000], dt_card=None, debug=False):
     """
@@ -430,6 +496,14 @@ def main_telegram_v13():
 
 def main_date(args):
     for filename in args.imgglob:
+        if 'bias' in filename:
+            pass
+        if 'skyflat' in filename:
+            pass
+#        final_message = get_altaz_dt_new(
+#            filename=filename, 
+#            dt_card=args.header_date
+#        )
         final_message, image_filename = get_altaz_dt(
             filename=filename, 
             get_from_az=args.get_from_az, 
@@ -445,6 +519,10 @@ if __name__ == '__main__':
         main_telegram_v13()
     else:
         if args.filename is not None:
+#            final_message = get_altaz_dt_new(
+#                filename=args.filename, 
+#                dt_card=args.header_date,
+#            )
             final_message, image_filename = get_altaz_dt(
                 filename=args.filename, 
                 get_from_az=args.get_from_az, 
