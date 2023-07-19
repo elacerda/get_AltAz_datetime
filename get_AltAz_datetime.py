@@ -79,8 +79,11 @@ def parse_arguments():
     # Parse arguments
     if args.filename is not None:
         if not isfile(args.filename):
-            print(f'{__script_name__}: {args.filename}: file not exists')
-            sys.exit(1)
+            raise FileNotFoundError(f'{__script_name__}: {args.filename}: file not exists')
+        if 'bias' in args.filename:            
+            raise NotImplementedError(f'{__script_name__}: {args.filename}: bias file')
+        if 'skyflat' in args.filename:            
+            raise NotImplementedError(f'{__script_name__}: {args.filename}: skyflat file')
     if args.date is not None:
         if len(args.date) != 8:
             print(f'Usage: {__script_name__} YYYYMMDD')
@@ -123,44 +126,45 @@ def get_altaz_dt_new(filename, dt_card=None):
         dt_card = 'DATE-OBS'
     dt_obs = pytz.utc.localize(datetime.fromisoformat(hdr.get(dt_card)))
     t80s_Time = t80s_obs.datetime_to_astropy_time(dt_obs)
-    print(dt_obs)
-    print(t80s_Time)
 
     # TARGET
     target_coords = SkyCoord(ra=hdr.get('CRVAL1'), dec=hdr.get('CRVAL2'), unit=(u.deg, u.deg))
-    _alt = hdr.get('HIERARCH T80S TEL EL START', None)
+    try:
+        _alt = hdr.get('ALT', None)
+    except:
+        _alt = hdr.get('HIERARCH T80S TEL EL START', None)
+    if _alt is None:
+        return f'{filename},{hdr.get("OBJECT")},{hdr.get("FILTER")},None,None'
+    
     target_input_alt = Angle(_alt, 'deg')
-    target_alt_set_Time = t80s_obs.target_set_time(
-        t80s_Time, 
-        target_coords,
-        horizon=target_input_alt,
-        which='nearest',
-        grid_times_targets=True,
-    )
 
-    target_alt_rise_Time = t80s_obs.target_rise_time(
-        t80s_Time, 
-        target_coords,
-        horizon=target_input_alt,
-        which='nearest',
-        grid_times_targets=True,
-    )
-
-    print(target_alt_rise_Time.datetime)
-    print(target_alt_set_Time.datetime)
-
-    diff_time_set = (target_alt_set_Time - t80s_Time).sec
-    diff_time_rise = (target_alt_rise_Time - t80s_Time).sec
-
-    diff_time = diff_time_set    
-    if abs(diff_time_rise) < abs(diff_time):
-        diff_time = diff_time_rise
-
-    target_dt_utc = target_alt_rise_Time.datetime  #t80s_obs.astropy_time_to_datetime(target_alt_rise_Time)
+    _times = []
+    _difftimes = []
+    for _T in [t80s_Time-10*u.min, t80s_Time, t80s_Time+10*u.min]:
+        rtime = t80s_obs.target_rise_time(
+            _T,
+            target_coords,
+            horizon=target_input_alt,
+            which='nearest',
+            n_grid_points=1800,
+        )
+        _times.append(rtime)
+        _difftimes.append((rtime - t80s_Time).sec)
+        stime = t80s_obs.target_set_time(
+            _T,
+            target_coords,
+            horizon=target_input_alt,
+            which='nearest',
+            n_grid_points=1800,
+        )
+        _times.append(stime)
+        _difftimes.append((stime - t80s_Time).sec)
+    i_min = np.argmin(np.abs(_difftimes)) 
+    target_dt_utc = _times[i_min].datetime
+    diff_time = _difftimes[i_min]
     final_message = f'{filename},{hdr.get("OBJECT")},{hdr.get("FILTER")},{target_dt_utc},{diff_time}'
 
     return final_message
-
 
 def get_altaz_dt(filename, get_from_az=False, plot=False, time_range=[-100, 1000], dt_card=None, debug=False):
     """
@@ -496,20 +500,16 @@ def main_telegram_v13():
 
 def main_date(args):
     for filename in args.imgglob:
-        if 'bias' in filename:
-            pass
-        if 'skyflat' in filename:
-            pass
-#        final_message = get_altaz_dt_new(
-#            filename=filename, 
-#            dt_card=args.header_date
-#        )
-        final_message, image_filename = get_altaz_dt(
+        final_message = get_altaz_dt_new(
             filename=filename, 
-            get_from_az=args.get_from_az, 
-            time_range=args.time_range,
-            plot=args.plot,
+            dt_card=args.header_date
         )
+#        final_message, image_filename = get_altaz_dt(
+#            filename=filename, 
+#            get_from_az=args.get_from_az, 
+#            time_range=args.time_range,
+#            plot=args.plot,
+#        )
         print(final_message)
 
 if __name__ == '__main__':
@@ -519,17 +519,17 @@ if __name__ == '__main__':
         main_telegram_v13()
     else:
         if args.filename is not None:
-#            final_message = get_altaz_dt_new(
-#                filename=args.filename, 
-#                dt_card=args.header_date,
-#            )
-            final_message, image_filename = get_altaz_dt(
+            final_message = get_altaz_dt_new(
                 filename=args.filename, 
-                get_from_az=args.get_from_az, 
-                time_range=args.time_range,
-                plot=args.plot,
                 dt_card=args.header_date,
             )
+#            final_message, image_filename = get_altaz_dt(
+#                filename=args.filename, 
+#                get_from_az=args.get_from_az, 
+#                time_range=args.time_range,
+#                plot=args.plot,
+#                dt_card=args.header_date,
+#            )
             print(final_message)
         elif args.date is not None:
             main_date(args)
